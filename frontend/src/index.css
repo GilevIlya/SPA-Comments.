@@ -1,0 +1,66 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ===== CSS-ПЕРЕМЕННЫЕ ДЛЯ ТЕМ ===== */
+:root {
+  --bg: #e8ecf1;
+  --text-primary: #0b1a33;
+  --text-secondary: #687184;
+  --text-muted: #8b949e;
+  --card-bg: #fff;
+  --card-border: rgba(0, 0, 0, 0.03);
+  --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  --divider-color: #d0d7de;
+  --comment-border: #f0f2f5;
+  --reply-border: #e8ecf1;
+  --reply-divider: #f5f6f8;
+  --avatar-bg: #d0d7de;
+  --avatar-color: #1f2a41;
+  --accent: #0056b3;
+  --btn-border: #d0d7de;
+  --btn-text: #1f2a41;
+  --lang-active-bg: #0b1a33;
+  --lang-active-text: white;
+  --filter-btn-bg: white;
+  --load-more-bg: transparent;
+  --mention-color: #0056b3;
+  --main-wrapper-bg: white;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1d23;
+  --text-primary: #e4e7ed;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --card-bg: #25282e;
+  --card-border: rgba(255, 255, 255, 0.06);
+  --card-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  --divider-color: #374151;
+  --comment-border: #2d3036;
+  --reply-border: #2d3036;
+  --reply-divider: #2d3036;
+  --avatar-bg: #374151;
+  --avatar-color: #e4e7ed;
+  --accent: #60a5fa;
+  --btn-border: #374151;
+  --btn-text: #e4e7ed;
+  --lang-active-bg: #60a5fa;
+  --lang-active-text: #0b1a33;
+  --filter-btn-bg: #25282e;
+  --load-more-bg: transparent;
+  --mention-color: #60a5fa;
+  --main-wrapper-bg: #25282e;
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  min-height: 100vh;
+  padding: 30px 40px;
+  position: relative;
+  color: var(--text-primary);
+  transition: background 0.3s, color 0.3s;
+}
