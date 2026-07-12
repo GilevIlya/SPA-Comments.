@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import DiscussionList from './components/DiscussionList';
 import CommentList from './components/CommentList';
-import { Discussion, Comment } from './types';
+import AuthModal from './components/AuthModal';
+import { api, clearTokens, isAuthenticated, AuthUser } from './api';
+import { Discussion } from './types';
 
 const t = {
   ru: {
@@ -10,94 +12,122 @@ const t = {
     filter: 'Сортировать:',
     filterDate: 'По дате',
     filterComments: 'По комментариям',
-    loadMore: 'Показать ещё',
-    loadMoreThread: 'Показать ещё комментарии',
     comments: 'Комментарии',
     commentStats: 'комментариев',
     discussion: 'Обсуждение',
     login: 'Вход',
     register: 'Регистрация',
+    logout: 'Выход',
     title: 'Обсуждения',
+    newDiscussion: '+ Новое обсуждение',
+    createTitle: 'Новое обсуждение',
+    create: 'Создать',
+    creating: 'Создание...',
+    titleRequired: 'Название обязательно.',
+    descPlaceholder: 'Описание (необязательно)',
   },
   en: {
     back: '← Back to discussions',
     filter: 'Sort:',
     filterDate: 'By date',
     filterComments: 'By comments',
-    loadMore: 'Show more',
-    loadMoreThread: 'Show more comments',
     comments: 'Comments',
     commentStats: 'comments',
     discussion: 'Discussion',
     login: 'Login',
     register: 'Register',
+    logout: 'Logout',
     title: 'Discussions',
+    newDiscussion: '+ New discussion',
+    createTitle: 'New discussion',
+    create: 'Create',
+    creating: 'Creating...',
+    titleRequired: 'Title is required.',
+    descPlaceholder: 'Description (optional)',
   },
 };
 
-const mockComments: Comment[] = [
-  {
-    id: 'c1',
-    author: 'Алексей Иванов',
-    authorInitial: 'А',
-    text: 'Коллеги, после обновления API заметил проблему с авторизацией. Приходит 401 даже с валидным токеном. Кто-то сталкивался?',
-    replies: [
-      {
-        id: 'r1', author: 'Мария Петрова', authorInitial: 'М',
-        text: '<span class="mention">@Алексей Иванов</span>, да, у нас тоже такая проблема. Оказалось, что изменили формат токена. Надо обновить интерцептор на фронте.',
-      },
-      {
-        id: 'r2', author: 'Дмитрий Смирнов', authorInitial: 'Д',
-        text: '<span class="mention">@Алексей Иванов</span> <span class="mention">@Мария Петрова</span>, ребята, я уже пофиксил. Ошибка была в том, что бэкенд начал возвращать токен в другом поле. Обновил документацию.',
-      },
-    ],
-  },
-  {
-    id: 'c2',
-    author: 'Олег Кузнецов',
-    authorInitial: 'О',
-    text: 'Отличная работа, Дмитрий! Закрываем вопрос. Кто следующий баг ловит? 😄',
-    replies: [
-      {
-        id: 'r3', author: 'Елена Ветрова', authorInitial: 'Е',
-        text: '<span class="mention">@Олег Кузнецов</span>, у меня есть вопрос по новому эндпоинту /users. В доке написано одно, а по факту приходит другой объект.',
-      },
-      {
-        id: 'r4', author: 'Алексей Иванов', authorInitial: 'А',
-        text: '<span class="mention">@Елена Ветрова</span>, да, я видел. Там добавили поле "role". Обнови схему, всё должно работать.',
-      },
-      {
-        id: 'r5', author: 'Дмитрий Смирнов', authorInitial: 'Д',
-        text: '<span class="mention">@Елена Ветрова</span>, подтверждаю. Там ещё добавили фильтрацию по ролям. Всё описано в новой версии документации.',
-      },
-    ],
-  },
-  {
-    id: 'c3',
-    author: 'Сергей Козлов',
-    authorInitial: 'С',
-    text: 'А когда планируете выкатывать фикс в прод? У нас завтра релиз, очень нужно.',
-    replies: [
-      {
-        id: 'r6', author: 'Дмитрий Смирнов', authorInitial: 'Д',
-        text: '<span class="mention">@Сергей Козлов</span>, уже запустил тесты. Если всё ок, сегодня к вечеру выкатим.',
-      },
-    ],
-  },
-];
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 65%, 55%)`;
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('ru-RU', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function formatError(err: unknown): string {
+  if (err instanceof Error) {
+    try {
+      const parsed = JSON.parse(err.message);
+      const messages = Object.entries(parsed)
+        .map(([key, val]) => `${key}: ${(val as string[]).join(' ')}`)
+        .join('\n');
+      return messages || err.message;
+    } catch {
+      return err.message;
+    }
+  }
+  return 'Произошла ошибка';
+}
 
 function App() {
   const [currentPage, setCurrentPage] = useState<'list' | 'thread'>('list');
   const [currentDiscussion, setCurrentDiscussion] = useState<Discussion | null>(null);
-  const [lang, setLang] = useState<'ru' | 'en'>('ru');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [lang, setLang] = useState<'ru' | 'en'>(() => {
+    return (localStorage.getItem('lang') as 'ru' | 'en') || 'ru';
+  });
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+  });
   const [sortBy, setSortBy] = useState<'date' | 'comments'>('date');
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   const i18n = t[lang];
 
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createTitle, setCreateTitle] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('lang', lang);
+  }, [lang]);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      api.me()
+        .then(setUser)
+        .catch(() => clearTokens());
+    }
+  }, []);
+
+  const openAuth = (mode: 'login' | 'register') => {
+    setAuthMode(mode);
+    setAuthOpen(true);
+  };
+
+  const handleLogout = () => {
+    clearTokens();
+    setUser(null);
+  };
 
   const toggleTheme = useCallback(() => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -113,6 +143,29 @@ function App() {
     setCurrentDiscussion(null);
     setCurrentPage('list');
     window.history.pushState(null, t.ru.title, '/');
+  };
+
+  const handleCreateDiscussion = async () => {
+    if (!createTitle.trim()) {
+      setCreateError(i18n.titleRequired);
+      return;
+    }
+    setCreateError(null);
+    setCreateLoading(true);
+    try {
+      await api.createDiscussion({
+        title: createTitle.trim(),
+        description: createDescription.trim(),
+      });
+      setCreateOpen(false);
+      setCreateTitle('');
+      setCreateDescription('');
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      setCreateError(formatError(err));
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
   const header = (
@@ -136,47 +189,109 @@ function App() {
           </span>
         </div>
         <div className="auth-buttons">
-          <span className="btn btn-outline">{i18n.login}</span>
-          <span className="btn btn-primary">{i18n.register}</span>
+          {user ? (
+            <div className="user-info">
+              <span
+                className="avatar user-avatar"
+                style={{ background: getAvatarColor(user.username) }}
+              >
+                {user.username.charAt(0).toUpperCase()}
+              </span>
+              <span className="user-badge">{user.username}</span>
+              <span className="btn btn-outline" onClick={handleLogout}>{i18n.logout}</span>
+            </div>
+          ) : (
+            <>
+              <span className="btn btn-outline" onClick={() => openAuth('login')}>{i18n.login}</span>
+              <span className="btn btn-primary" onClick={() => openAuth('register')}>{i18n.register}</span>
+            </>
+          )}
         </div>
       </div>
+      {authOpen && (
+        <AuthModal
+          mode={authMode}
+          onClose={() => setAuthOpen(false)}
+          onSwitch={(m) => setAuthMode(m)}
+          onSuccess={(u) => {
+            setUser(u);
+            setAuthOpen(false);
+          }}
+        />
+      )}
     </>
+  );
+
+  const createModal = createOpen && (
+    <div className="modal-overlay" onClick={() => setCreateOpen(false)}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <button className="modal-close" onClick={() => setCreateOpen(false)}>×</button>
+        <h2 className="modal-title">{i18n.createTitle}</h2>
+        <div className="auth-form">
+          <input
+            className="auth-input"
+            placeholder="Название"
+            value={createTitle}
+            onChange={e => setCreateTitle(e.target.value)}
+            maxLength={80}
+            required
+          />
+          <textarea
+            className="auth-input"
+            placeholder={i18n.descPlaceholder}
+            value={createDescription}
+            onChange={e => setCreateDescription(e.target.value)}
+            rows={3}
+            style={{ resize: 'vertical' }}
+          />
+          {createError && <div className="auth-error">{createError}</div>}
+          <button
+            className="btn btn-primary auth-submit"
+            onClick={handleCreateDiscussion}
+            disabled={createLoading}
+          >
+            {createLoading ? i18n.creating : i18n.create}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 
   if (currentPage === 'thread' && currentDiscussion) {
     return (
       <>
         {header}
-
         <div className="container">
           <button className="back-link" onClick={handleBack}>
             {i18n.back}
           </button>
-
           <div className="main-wrapper">
             <div className="discussion-header">
               <div className="discussion-title">{currentDiscussion.title}</div>
+              {currentDiscussion.description && (
+                <div className="discussion-description">{currentDiscussion.description}</div>
+              )}
               <div className="discussion-meta">
                 <span className="author">
-                  <span className="avatar">{currentDiscussion.authorInitial}</span>
-                  {currentDiscussion.author}
+                  <span
+                    className="avatar"
+                    style={{ background: getAvatarColor(currentDiscussion.author_name) }}
+                  >
+                    {currentDiscussion.author_name.charAt(0).toUpperCase()}
+                  </span>
+                  {currentDiscussion.author_name}
                 </span>
-                <span className="stats">💬 {currentDiscussion.commentCount} {i18n.commentStats}</span>
+                <span className="date">{formatDate(currentDiscussion.created_at)}</span>
+                <span className="stats">💬 {currentDiscussion.comment_count} {i18n.commentStats}</span>
               </div>
             </div>
-
             <div className="divider-wrapper">
               <div className="divider-line"></div>
               <span className="divider-label">{i18n.discussion}</span>
               <div className="divider-line"></div>
             </div>
-
             <div className="comments-title">{i18n.comments}</div>
-            <CommentList comments={mockComments} />
-
-            <div className="footer">
-              <span className="btn-load-more">{i18n.loadMoreThread}</span>
-            </div>
+            <CommentList discussionId={currentDiscussion.id} />
           </div>
         </div>
       </>
@@ -186,10 +301,8 @@ function App() {
   return (
     <>
       {header}
-
       <div className="container">
         <h1 className="page-title">{i18n.title}</h1>
-
         <div className="filter-bar">
           <span className="filter-label">{i18n.filter}</span>
           <div className="filter-buttons">
@@ -206,16 +319,17 @@ function App() {
               {i18n.filterComments}
             </button>
           </div>
+          {isAuthenticated() && (
+            <button className="btn btn-primary create-disc-btn" onClick={() => setCreateOpen(true)}>
+              {i18n.newDiscussion}
+            </button>
+          )}
         </div>
-
         <div className="discussions-list">
-          <DiscussionList sortBy={sortBy} onSelect={handleSelectDiscussion} />
-        </div>
-
-        <div className="footer" style={{ borderTop: 'none', marginTop: 0, paddingTop: 0 }}>
-          <span className="btn-load-more">{i18n.loadMore}</span>
+          <DiscussionList sortBy={sortBy} onSelect={handleSelectDiscussion} refreshKey={refreshKey} />
         </div>
       </div>
+      {createModal}
     </>
   );
 }

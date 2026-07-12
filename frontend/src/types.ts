@@ -1,17 +1,34 @@
 export interface Comment {
-  id: string | number;
+  id: number;
+  discussion: number;
   author: string;
-  authorInitial: string;
+  author_name: string;
   text: string;
-  likes?: number;
-  replies?: Comment[];
+  parent: number | null;
+  file: string | null;
+  file_url: string | null;
+  replies: Comment[];
+  created_at: string;
 }
 
 export interface Discussion {
-  id: string;
+  id: number;
   title: string;
+  description: string;
   author: string;
-  authorInitial: string;
-  date: string;
-  commentCount: number;
+  author_name: string;
+  comment_count: number;
+  created_at: string;
+}
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export interface CaptchaResponse {
+  token: string;
+  image: string; // hex-encoded PNG
 }
