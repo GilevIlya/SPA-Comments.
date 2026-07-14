@@ -40,7 +40,6 @@ class DiscussionListView(APIView):
             discussions = discussions.order_by(
                 '-created_at'
             )
-
         serializer = DiscussionListSerializer(
             discussions,
             many=True

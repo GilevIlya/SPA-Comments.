@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
+import dj_database_url
 
 load_dotenv()
 
@@ -15,12 +16,12 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes', '
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'daphne',
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
@@ -46,7 +47,6 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'comments_backend.urls'
 
-# Прямой путь к папке build для поиска index.html
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -65,10 +65,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'comments_backend.wsgi.application'
 
-# Database configuration from DATABASE_URL or individual env vars
+
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    import dj_database_url
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL, 
@@ -124,7 +123,6 @@ STORAGES = {
     },
 }
 
-# Media files for uploads
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -147,27 +145,25 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
 }
 
-# CAPTCHA settings (django-simple-captcha)
-CAPTCHA_LENGTH = 5
-CAPTCHA_TIMEOUT = 300  # 5 minutes
 
-# ASGI / Channels
+CAPTCHA_LENGTH = 5
+CAPTCHA_TIMEOUT = 300
+
+
 ASGI_APPLICATION = 'comments_backend.asgi.application'
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.environ.get("REDIS_URL")
 if REDIS_URL:
     CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL],
-            "expiry": 60,
-            "group_expiry": 86400,
+        "default": {
+            "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+                "expiry": 60,
+                "group_expiry": 86400,
+            },
         },
-    },
-}
-
-
+    }
 else:
     CHANNEL_LAYERS = {
         'default': {

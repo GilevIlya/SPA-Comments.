@@ -15,14 +15,14 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_username(self, value):
         if User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError(
-                'A user with this username already exists.'
+                'Пользователь с таким именем уже существует.'
             )
         return value
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError(
-                {'password': 'Passwords do not match.'}
+                {'password': 'Пароли не совпадают.'}
             )
         return attrs
 

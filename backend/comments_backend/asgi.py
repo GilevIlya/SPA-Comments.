@@ -6,11 +6,9 @@ from channels.auth import AuthMiddlewareStack
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'comments_backend.settings')
 
-# Initialize Django ASGI application early to populate the app registry
-# before importing code that may import models.
 django_asgi_app = get_asgi_application()
 
-from comments.routing import websocket_urlpatterns  # noqa: E402
+from comments.routing import websocket_urlpatterns
 
 application = ProtocolTypeRouter({
     'http': django_asgi_app,

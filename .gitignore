@@ -52,3 +52,5 @@ yarn-error.log*
 .pytest_cache/
 .coverage
 htmlcov/
+pyproject.toml
+uv.lock
