@@ -282,7 +282,6 @@ function App() {
                   {currentDiscussion.author_name}
                 </span>
                 <span className="date">{formatDate(currentDiscussion.created_at)}</span>
-                <span className="stats">💬 {currentDiscussion.comment_count} {i18n.commentStats}</span>
               </div>
             </div>
             <div className="divider-wrapper">

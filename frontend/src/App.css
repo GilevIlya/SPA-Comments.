@@ -37,7 +37,6 @@
   --avatar-bg: #3a3a5a;
   --avatar-color: #7b7bff;
   --mention-color: #7b7bff;
-  --divider-color: #333355;
   --comment-border: #333355;
   --reply-border: #3a3a5a;
   --reply-divider: #333355;
@@ -316,6 +315,8 @@ body {
   color: var(--text-primary);
   letter-spacing: -0.5px;
   line-height: 1.2;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .discussion-description {
@@ -323,6 +324,8 @@ body {
   font-size: 16px;
   color: var(--text-secondary);
   line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .discussion-meta {
@@ -436,6 +439,13 @@ body {
   font-weight: 600;
 }
 
+.reply-to {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mention-color);
+  margin-left: 8px;
+}
+
 .comment-date {
   font-size: 13px;
   font-weight: 400;
@@ -448,6 +458,8 @@ body {
   color: var(--text-primary);
   line-height: 1.7;
   padding-left: 48px;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .comment-text .mention {
@@ -563,6 +575,7 @@ body {
   border-radius: 8px;
   border: 1px solid var(--btn-border);
   transition: background 0.15s;
+  max-width: 100%;
 }
 
 .file-text:hover {
@@ -571,11 +584,16 @@ body {
 
 .file-icon {
   font-size: 20px;
+  flex-shrink: 0;
 }
 
 .file-name {
   font-size: 14px;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
 }
 
 /* ===== LIGHTBOX ===== */
@@ -721,6 +739,8 @@ body {
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ===== FILE UPLOAD ===== */
@@ -808,6 +828,14 @@ body {
 
 .captcha-input:focus {
   border-color: var(--accent);
+}
+
+.captcha-modal-hint {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* ===== FORM ACTIONS ===== */
@@ -922,6 +950,8 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   flex: 1;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .card-description {
@@ -929,6 +959,8 @@ body {
   font-size: 14px;
   color: var(--text-secondary);
   line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .card-meta {

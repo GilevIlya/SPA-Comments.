@@ -3,6 +3,7 @@ export interface Comment {
   discussion: number;
   author: string;
   author_name: string;
+  parent_author_name: string | null;
   text: string;
   parent: number | null;
   file: string | null;
@@ -30,5 +31,5 @@ export interface PaginatedResponse<T> {
 
 export interface CaptchaResponse {
   token: string;
-  image: string; // hex-encoded PNG
+  image_url: string; // URL to CAPTCHA image
 }

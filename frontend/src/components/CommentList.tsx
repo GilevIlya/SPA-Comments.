@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Comment } from '../types';
 import { api, isAuthenticated } from '../api';
+import CaptchaModal from './CaptchaModal';
+import { useDiscussionSocket } from '../useDiscussionSocket';
 
 interface CommentListProps {
   discussionId: number;
@@ -67,6 +69,9 @@ const FileAttachment: React.FC<{ fileUrl: string; fileName?: string | null }> = 
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const ext = (fileName || fileUrl).split('.').pop()?.toLowerCase();
   const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(ext || '');
+  
+  // Extract just the filename from the path
+  const displayName = (fileName || fileUrl).split('/').pop() || 'text.txt';
 
   if (isImage) {
     return (
@@ -85,7 +90,7 @@ const FileAttachment: React.FC<{ fileUrl: string; fileName?: string | null }> = 
     <>
       <div className="file-attachment file-text" onClick={() => setLightboxOpen(true)}>
         <span className="file-icon">📄</span>
-        <span className="file-name">{fileName || 'text.txt'}</span>
+        <span className="file-name">{displayName}</span>
       </div>
       {lightboxOpen && (
         <Lightbox src={fileUrl} type="text" onClose={() => setLightboxOpen(false)} />
@@ -97,18 +102,34 @@ const FileAttachment: React.FC<{ fileUrl: string; fileName?: string | null }> = 
 // Comment item with replies
 const CommentItem: React.FC<{
   comment: Comment;
-  onReply: (parentId: number, text: string) => void;
+  onRequestReplyCaptcha: (parentId: number, text: string, file: File | null) => void;
   replyFormOpen: number | null;
   setReplyFormOpen: (id: number | null) => void;
-}> = ({ comment, onReply, replyFormOpen, setReplyFormOpen }) => {
+}> = ({ comment, onRequestReplyCaptcha, replyFormOpen, setReplyFormOpen }) => {
   const [replyText, setReplyText] = useState('');
+  const [replyFile, setReplyFile] = useState<File | null>(null);
 
   const submitReply = () => {
     const text = replyText.trim();
     if (!text) return;
-    onReply(comment.id, text);
+    onRequestReplyCaptcha(comment.id, text, replyFile);
     setReplyText('');
+    setReplyFile(null);
     setReplyFormOpen(null);
+  };
+
+  const insertReplyTag = (openTag: string, closeTag: string) => {
+    const textarea = document.querySelector('.reply-textarea') as HTMLTextAreaElement;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = replyText.substring(start, end);
+    const newText = replyText.substring(0, start) + openTag + selected + closeTag + replyText.substring(end);
+    setReplyText(newText);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = start + openTag.length + selected.length + closeTag.length;
+    }, 0);
   };
 
   return (
@@ -121,6 +142,9 @@ const CommentItem: React.FC<{
           {comment.author_name.charAt(0).toUpperCase()}
         </span>
         {comment.author_name}
+        {comment.parent_author_name && (
+          <span className="reply-to">→ @{comment.parent_author_name}</span>
+        )}
         <span className="comment-date">{formatDate(comment.created_at)}</span>
       </div>
       <div
@@ -144,18 +168,67 @@ const CommentItem: React.FC<{
       </div>
 
       {replyFormOpen === comment.id && (
-        <div className="reply-box">
+        <div className="new-comment-form">
+          <h3 className="form-title">Ответить</h3>
+
+          {/* HTML Toolbar */}
+          <div className="html-toolbar">
+            {HTML_TAGS.map(({ tag, label, open, close }) => (
+              <button
+                key={tag}
+                className="html-tag-btn"
+                onClick={() => insertReplyTag(open, close)}
+                title={`Вставить ${label}`}
+                type="button"
+              >
+                {label === 'a' ? 'link' : `<${label}>`}
+              </button>
+            ))}
+          </div>
+
+          {/* Textarea */}
           <textarea
-            className="reply-input"
-            placeholder="Ваш ответ…"
+            className="comment-textarea"
+            placeholder="Текст комментария (разрешены теги: <i>, <strong>, <code>, <a>)"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
+            rows={5}
           />
-          <div className="reply-box-actions">
-            <button className="btn btn-primary reply-send" onClick={submitReply}>
+
+          {/* Preview */}
+          {replyText.trim() && (
+            <div className="comment-preview">
+              <div className="preview-label">Предпросмотр:</div>
+              <div
+                className="preview-content"
+                dangerouslySetInnerHTML={{ __html: replyText }}
+              />
+            </div>
+          )}
+
+          {/* File upload */}
+          <div className="file-upload">
+            <label className="file-upload-label">
+              📎 Прикрепить файл (JPG, PNG, GIF до 320x240 или TXT до 100KB)
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.gif,.txt"
+                onChange={(e) => setReplyFile(e.target.files?.[0] || null)}
+                className="file-input"
+              />
+            </label>
+            {replyFile && <span className="file-name-selected">{replyFile.name}</span>}
+          </div>
+
+          <div className="form-actions">
+            <button className="btn btn-primary" onClick={submitReply}>
               Отправить
             </button>
-            <button className="btn btn-outline reply-cancel" onClick={() => setReplyFormOpen(null)}>
+            <button className="btn btn-outline" onClick={() => {
+              setReplyFormOpen(null);
+              setReplyText('');
+              setReplyFile(null);
+            }}>
               Отмена
             </button>
           </div>
@@ -168,7 +241,7 @@ const CommentItem: React.FC<{
             <CommentItem
               key={reply.id}
               comment={reply}
-              onReply={onReply}
+              onRequestReplyCaptcha={onRequestReplyCaptcha}
               replyFormOpen={replyFormOpen}
               setReplyFormOpen={setReplyFormOpen}
             />
@@ -189,16 +262,17 @@ const CommentList: React.FC<CommentListProps> = ({ discussionId }) => {
   // New comment form
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [captchaToken, setCaptchaToken] = useState('');
-  const [captchaImage, setCaptchaImage] = useState('');
-  const [captchaText, setCaptchaText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
   const [mainFormOpen, setMainFormOpen] = useState(false);
 
   // Reply state
   const [replyFormOpen, setReplyFormOpen] = useState<number | null>(null);
+
+  // Captcha modal state
+  const [commentCaptchaOpen, setCommentCaptchaOpen] = useState(false);
+  const [replyCaptchaOpen, setReplyCaptchaOpen] = useState(false);
+  const [pendingReply, setPendingReply] = useState<{ parentId: number; text: string; file: File | null } | null>(null);
 
   // Load comments
   useEffect(() => {
@@ -207,6 +281,7 @@ const CommentList: React.FC<CommentListProps> = ({ discussionId }) => {
     api.getComments(discussionId, page)
       .then((data) => {
         if (!cancelled) {
+          console.log('Comments API response:', data);
           setComments(data.results);
           setTotalPages(Math.ceil(data.count / 25));
         }
@@ -215,27 +290,6 @@ const CommentList: React.FC<CommentListProps> = ({ discussionId }) => {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [discussionId, page]);
-
-  // Load CAPTCHA
-  const loadCaptcha = useCallback(() => {
-    api.getCaptcha()
-      .then((data) => {
-        setCaptchaToken(data.token);
-        // Convert hex to base64 data URL
-        const bytes = new Uint8Array(data.image.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
-        const blob = new Blob([bytes], { type: 'image/png' });
-        const reader = new FileReader();
-        reader.onload = () => setCaptchaImage(reader.result as string);
-        reader.readAsDataURL(blob);
-      })
-      .catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated()) {
-      loadCaptcha();
-    }
-  }, [loadCaptcha]);
 
   // Insert HTML tag into text
   const insertTag = (openTag: string, closeTag: string) => {
@@ -252,66 +306,104 @@ const CommentList: React.FC<CommentListProps> = ({ discussionId }) => {
     }, 0);
   };
 
-  // Submit new comment
-  const handleSubmit = async () => {
+  // Open captcha modal for new comment
+  const openCommentCaptcha = () => {
     if (!text.trim()) {
       setError('Текст комментария обязателен.');
       return;
     }
     setError(null);
-    setSubmitting(true);
+    setCommentCaptchaOpen(true);
+  };
+
+  // Submit new comment (called after captcha confirmed)
+  const submitComment = async (token: string, captchaText: string): Promise<Comment | null> => {
+    const formData = new FormData();
+    formData.append('discussion', String(discussionId));
+    formData.append('text', text);
+    formData.append('captcha_token', token);
+    formData.append('captcha_text', captchaText);
+    if (file) formData.append('file', file);
 
     try {
-      const formData = new FormData();
-      formData.append('discussion', String(discussionId));
-      formData.append('text', text);
-      formData.append('captcha_token', captchaToken);
-      formData.append('captcha_text', captchaText);
-      if (file) formData.append('file', file);
-
       const newComment = await api.createComment(formData);
-      setComments(prev => [newComment, ...prev]);
       setText('');
       setFile(null);
-      setCaptchaText('');
-      loadCaptcha();
+      setMainFormOpen(false);
+      return newComment;
     } catch (err) {
-      setError(formatError(err));
-      loadCaptcha();
-    } finally {
-      setSubmitting(false);
+      const errorMsg = formatError(err);
+      // Check if it's a validation error (text/file) — show in form
+      if (errorMsg.toLowerCase().includes('текст') || 
+          errorMsg.toLowerCase().includes('тег') || 
+          errorMsg.toLowerCase().includes('xhtml') ||
+          errorMsg.toLowerCase().includes('вложенность') ||
+          errorMsg.toLowerCase().includes('закрыт') ||
+          errorMsg.toLowerCase().includes('файл') ||
+          errorMsg.toLowerCase().includes('размер')) {
+        setError(errorMsg);
+        setMainFormOpen(true);
+        return null; // signal CaptchaModal to close silently
+      }
+      // Otherwise it's a captcha error — re-throw
+      throw err;
     }
   };
 
-  // Submit reply
-  const handleReply = async (parentId: number, replyText: string) => {
+  // Open captcha modal for reply
+  const requestReplyCaptcha = (parentId: number, replyText: string, replyFile: File | null = null) => {
+    setPendingReply({ parentId, text: replyText, file: replyFile });
+    setReplyCaptchaOpen(true);
+  };
+
+  // Submit reply (called after captcha confirmed)
+  const submitReply = async (token: string, captchaText: string): Promise<Comment | null> => {
+    if (!pendingReply) throw new Error('Нет данных для ответа.');
+    const formData = new FormData();
+    formData.append('discussion', String(discussionId));
+    formData.append('text', pendingReply.text);
+    formData.append('parent', String(pendingReply.parentId));
+    formData.append('captcha_token', token);
+    formData.append('captcha_text', captchaText);
+    if (pendingReply.file) formData.append('file', pendingReply.file);
+
     try {
-      const formData = new FormData();
-      formData.append('discussion', String(discussionId));
-      formData.append('text', replyText);
-      formData.append('parent', String(parentId));
-      formData.append('captcha_token', captchaToken);
-      formData.append('captcha_text', captchaText);
-
       const newReply = await api.createComment(formData);
-      // Update local state to show reply
-      const updateReplies = (comments: Comment[]): Comment[] =>
-        comments.map(c => {
-          if (c.id === parentId) {
-            return { ...c, replies: [...(c.replies || []), newReply] };
-          }
-          if (c.replies) {
-            return { ...c, replies: updateReplies(c.replies) };
-          }
-          return c;
-        });
-      setComments(prev => updateReplies(prev));
-      loadCaptcha();
+      setPendingReply(null);
+      return newReply;
     } catch (err) {
-      setError(formatError(err));
-      loadCaptcha();
+      const errorMsg = formatError(err);
+      if (errorMsg.toLowerCase().includes('текст') || 
+          errorMsg.toLowerCase().includes('тег') || 
+          errorMsg.toLowerCase().includes('xhtml') ||
+          errorMsg.toLowerCase().includes('вложенность') ||
+          errorMsg.toLowerCase().includes('закрыт') ||
+          errorMsg.toLowerCase().includes('файл') ||
+          errorMsg.toLowerCase().includes('размер')) {
+        // Show error in reply form — keep it open with its own state
+        setReplyFormOpen(pendingReply.parentId);
+        setPendingReply(null);
+        return null; // signal CaptchaModal to close silently
+      }
+      throw err;
     }
   };
+
+  // Handle real-time comment pushed via WebSocket
+  const handleIncoming = useCallback((incoming: Comment) => {
+    setComments(prev => {
+      const exists = prev.some(c => c.id === incoming.id);
+      if (exists) {
+        // Replace existing (e.g. parent comment with updated replies)
+        return prev.map(c => (c.id === incoming.id ? incoming : c));
+      }
+      // New top-level comment -> prepend (LIFO)
+      return [incoming, ...prev];
+    });
+  }, []);
+
+  // Connect to discussion websocket for live updates
+  useDiscussionSocket({ discussionId, onNewComment: handleIncoming });
 
   if (loading) {
     return <div className="loading">Загрузка комментариев...</div>;
@@ -321,7 +413,7 @@ const CommentList: React.FC<CommentListProps> = ({ discussionId }) => {
     <div className="comments-section">
       {/* New comment form toggle button */}
       {isAuthenticated() && !mainFormOpen && (
-        <button 
+        <button
           className="btn btn-primary show-comment-form-btn"
           onClick={() => setMainFormOpen(true)}
         >
@@ -383,38 +475,15 @@ const CommentList: React.FC<CommentListProps> = ({ discussionId }) => {
             {file && <span className="file-name-selected">{file.name}</span>}
           </div>
 
-          {/* CAPTCHA */}
-          <div className="captcha-section">
-            {captchaImage && (
-              <div className="captcha-image-wrapper">
-                <img src={captchaImage} alt="CAPTCHA" className="captcha-image" />
-                <button
-                  type="button"
-                  className="captcha-refresh"
-                  onClick={loadCaptcha}
-                  title="Обновить CAPTCHA"
-                >
-                  🔄
-                </button>
-              </div>
-            )}
-            <input
-              className="captcha-input"
-              placeholder="Введите код с картинки"
-              value={captchaText}
-              onChange={(e) => setCaptchaText(e.target.value)}
-            />
-          </div>
-
           {error && <div className="form-error">{error}</div>}
 
           <div className="form-actions">
             <button
               className="btn btn-primary"
-              onClick={handleSubmit}
+              onClick={openCommentCaptcha}
               disabled={submitting}
             >
-              {submitting ? 'Отправка...' : 'Отправить'}
+              Отправить
             </button>
             <button
               className="btn btn-outline"
@@ -446,7 +515,7 @@ const CommentList: React.FC<CommentListProps> = ({ discussionId }) => {
             <CommentItem
               key={comment.id}
               comment={comment}
-              onReply={handleReply}
+              onRequestReplyCaptcha={requestReplyCaptcha}
               replyFormOpen={replyFormOpen}
               setReplyFormOpen={setReplyFormOpen}
             />
@@ -474,6 +543,25 @@ const CommentList: React.FC<CommentListProps> = ({ discussionId }) => {
           </button>
         </div>
       )}
+
+      {/* Captcha modal for new comment */}
+      <CaptchaModal
+        open={commentCaptchaOpen}
+        title="Подтверждение комментария"
+        onClose={() => setCommentCaptchaOpen(false)}
+        onConfirm={submitComment}
+      />
+
+      {/* Captcha modal for reply */}
+      <CaptchaModal
+        open={replyCaptchaOpen}
+        title="Подтверждение ответа"
+        onClose={() => {
+          setReplyCaptchaOpen(false);
+          setPendingReply(null);
+        }}
+        onConfirm={submitReply}
+      />
     </div>
   );
 };
