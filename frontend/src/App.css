@@ -717,6 +717,25 @@ body {
   border-color: var(--accent);
 }
 
+.reply-textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--btn-border);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--card-bg);
+  transition: border-color 0.15s;
+}
+
+.reply-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 /* ===== PREVIEW ===== */
 .comment-preview {
   margin-top: 12px;

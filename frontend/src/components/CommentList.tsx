@@ -188,7 +188,7 @@ const CommentItem: React.FC<{
 
           {/* Textarea */}
           <textarea
-            className="comment-textarea"
+            className="reply-textarea"
             placeholder="Текст комментария (разрешены теги: <i>, <strong>, <code>, <a>)"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
