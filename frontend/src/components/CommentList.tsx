@@ -141,9 +141,9 @@ const CommentItem: React.FC<{
         >
           {comment.author_name.charAt(0).toUpperCase()}
         </span>
-        {comment.author_name}
+        {comment.author_name.length > 20 ? comment.author_name.substring(0, 20) + '...' : comment.author_name}
         {comment.parent_author_name && (
-          <span className="reply-to">→ @{comment.parent_author_name}</span>
+          <span className="reply-to">→ @{comment.parent_author_name.length > 20 ? comment.parent_author_name.substring(0, 20) + '...' : comment.parent_author_name}</span>
         )}
         <span className="comment-date">{formatDate(comment.created_at)}</span>
       </div>

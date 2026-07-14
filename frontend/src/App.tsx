@@ -197,7 +197,7 @@ function App() {
               >
                 {user.username.charAt(0).toUpperCase()}
               </span>
-              <span className="user-badge">{user.username}</span>
+              <span className="user-badge" title={user.username}>{user.username}</span>
               <span className="btn btn-outline" onClick={handleLogout}>{i18n.logout}</span>
             </div>
           ) : (
