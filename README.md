@@ -48,7 +48,7 @@ The project was developed as a test assignment using **Django REST Framework** a
 
 ```bash
 git clone https://github.com/GilevIlya/SPA-Comments..git
-cd SPA-Comments
+cd SPA-Comments.
 ```
 
 ### Run with Docker
